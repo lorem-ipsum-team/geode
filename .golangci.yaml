@@ -1,0 +1,45 @@
+# See the dedicated "version" documentation section.
+version: "2"
+formatters:
+  enable:
+    - gci
+    - gofumpt
+    - goimports
+    - golines
+  settings:
+    golines:
+      max-len: 120
+      tab-len: 4
+      shorten-comments: false
+      reformat-tags: true
+      chain-split-dots: true
+linters:
+  # See the dedicated "linters" documentation section.
+  default: all
+  disable:
+    - depguard
+    - wrapcheck
+    - nonamedreturns
+  settings:
+    varnamelen:
+      ignore-names:
+        - tx
+        - db
+      ignore-decls:
+      - w http.ResponseWriter
+      - r *http.Request
+    revive:
+      rules:
+        - name: package-comments
+          disabled: true
+        - name: line-length-limit
+          arguments: [120]
+    mnd:
+      ignored-numbers:
+        - "1"
+        - "2"
+        - "3"
+        - "10"
+        - "100"
+
+      
