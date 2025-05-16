@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	postgres_mig "github.com/lorem-ipsum-team/geode/db/postgres"
 	"github.com/lorem-ipsum-team/geode/logger"
 )
 
@@ -18,15 +17,7 @@ type Repo struct {
 
 func NewRepo(ctx context.Context, log *slog.Logger, connString string) (Repo, error) {
 	log = log.WithGroup("postgres_repo")
-	log.Info("connect to db", slog.Any("connection string", logger.Secret(connString)))
-	log.InfoContext(ctx, "running migrations")
-
-	err := postgres_mig.Up(ctx, connString)
-	if err != nil {
-		return Repo{}, fmt.Errorf("failed to run migration: %w", err)
-	}
-
-	log.InfoContext(ctx, "creating pgx connection pool")
+	log.InfoContext(ctx, "connect to db", slog.Any("connection string", logger.Secret(connString)))
 
 	pool, err := pgxpool.New(ctx, connString)
 	if err != nil {
