@@ -3,6 +3,8 @@ package http
 import (
 	"log/slog"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	postgres_repo "github.com/lorem-ipsum-team/geode/internal/postgres"
@@ -41,7 +43,26 @@ func (s Server) registerHandlers() {
 	mux.HandleFunc("POST /geo", s.handleGetSwipes)
 	mux.HandleFunc("GET /healthy", s.handleHealthy)
 
-	s.Server.Handler = loggingMiddleware(mux, s.log)
+	corsMiddleware := CORS(CORSOptions{
+		AllowedOrigins: []string{"http://localhost:3000"},
+		AllowedMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodDelete,
+			http.MethodPatch,
+			http.MethodOptions,
+		},
+		AllowedHeaders: []string{
+			"Origin",
+			"Content-Type",
+			"Accept",
+			"Authorization",
+		},
+		AllowCredentials: true,
+	})
+
+	s.Server.Handler = loggingMiddleware(corsMiddleware(mux), s.log)
 }
 
 func loggingMiddleware(next http.Handler, log *slog.Logger) http.Handler {
@@ -71,4 +92,69 @@ type loggingResponseWriter struct {
 func (lrw *loggingResponseWriter) WriteHeader(code int) {
 	lrw.statusCode = code
 	lrw.ResponseWriter.WriteHeader(code)
+}
+
+type CORSOptions struct {
+	AllowedOrigins   []string
+	AllowedMethods   []string
+	AllowedHeaders   []string
+	AllowCredentials bool
+	MaxAge           int
+}
+
+func CORS(opts CORSOptions) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			origin := r.Header.Get("Origin")
+
+			// Check if origin is allowed
+			if len(opts.AllowedOrigins) > 0 {
+				allowed := false
+
+				for _, o := range opts.AllowedOrigins {
+					if o == "*" || o == origin {
+						allowed = true
+
+						break
+					}
+				}
+
+				if !allowed {
+					next.ServeHTTP(w, r)
+
+					return
+				}
+			}
+
+			// Set headers
+			if len(opts.AllowedOrigins) > 0 {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+			}
+
+			if len(opts.AllowedMethods) > 0 {
+				w.Header().Set("Access-Control-Allow-Methods", strings.Join(opts.AllowedMethods, ", "))
+			}
+
+			if len(opts.AllowedHeaders) > 0 {
+				w.Header().Set("Access-Control-Allow-Headers", strings.Join(opts.AllowedHeaders, ", "))
+			}
+
+			if opts.AllowCredentials {
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+			}
+
+			if opts.MaxAge > 0 {
+				w.Header().Set("Access-Control-Max-Age", strconv.Itoa(opts.MaxAge))
+			}
+
+			// Handle preflight
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
 }
